@@ -7,17 +7,17 @@
 
 (defn init-channels! [s]
   (let [incoming-ch (a/chan 10)
-        ;publication (a/pub incoming-ch :command-type #(case % :bot (a/dropping-buffer 10) :regular (a/dropping-buffer 10)))
-        bot-ch      (a/chan 10)
+        publication (a/pub incoming-ch :command-type #(case % :bot (a/dropping-buffer 10) :regular (a/dropping-buffer 10)))
+        bot-ch      (a/chan 10 (remove (comp empty? :commands)))
+        regular-ch  (a/chan 10 (remove (comp empty? :commands)))
         outgoing-ch (a/chan 10)
-        regular-ch (a/chan 10)
         chat-latch (atom true)]
-    ;(a/sub publication :bot bot-ch)
-    ;(a/sub publication :regular regular-ch)
+    (a/sub publication :bot bot-ch)
+    (a/sub publication :regular regular-ch)
     {:incoming incoming-ch :bot bot-ch :regular regular-ch :outgoing outgoing-ch :chat-latch chat-latch}))
 
 (defn stop-channels! [s]
   (some-> s :chat-latch (reset! false))
-  ;(some-> s :pub a/unsub-all)
+  (some-> s :pub a/unsub-all)
   (doseq [k [:incoming :bot :regular :outgoing]]
     (some-> s k a/close!)))

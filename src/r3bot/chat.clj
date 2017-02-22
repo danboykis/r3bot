@@ -69,7 +69,7 @@
       {:from (fuzzy/fuzzy-decide-station from)
        :to   (fuzzy/fuzzy-decide-station to)})))
 
-(defn chat-poller! [{:keys [regular bot]}]
+(defn chat-poller! [{:keys [incoming]}]
   (let [c (a/chan)]
     (telegram/get-request! (telegram/query-offset @state) (telegram/async-telegram c))
     (a/go
@@ -80,8 +80,8 @@
             (swap! state assoc ::telegram/offset (telegram/max-offset response))
             (let [regular-commands  (remove telegram/bot-command? result)
                   bot-commands      (filter telegram/bot-command? result)]
-              (a/>! regular {:commands regular-commands})
-              (a/>! bot     {:commands bot-commands})))
+              (a/>! incoming {:command-type :regular :commands regular-commands})
+              (a/>! incoming {:command-type :bot     :commands bot-commands})))
           (telegram/get-request! (telegram/query-offset @state) (telegram/async-telegram c)))))))
 
 (defn chat-sender! [outgoing-ch]
