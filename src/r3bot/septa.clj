@@ -6,13 +6,16 @@
             [clojure.set :as cs]
             [cuerdas.core :as ss]
             [clojure.spec :as s])
-  (:import [java.net URLEncoder]))
+  (:import [java.net URLEncoder URLDecoder]))
 
 (defn arrivals-url [] (-> @state :r3bot.core/config :septa :arrivals-url))
 (defn train-view-url [] (-> @state :r3bot.core/config :septa :train-view-url))
 
 (defn url-encode [string]
   (some-> string str (URLEncoder/encode "UTF-8") (.replace "+" "%20")))
+
+(defn url-decode [string]
+  (some-> string str (URLDecoder/decode "UTF-8")))
 
 (defn async-setpa [ch]
   (fn [r] (a/put! ch r)))

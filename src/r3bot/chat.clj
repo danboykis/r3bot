@@ -93,10 +93,15 @@
           (a/<! c))))))
 
 (defn format-direction [{:keys [from to]}]
-  (str "\uD83D\uDCCD " (s/capitalize (name from)) " \uD83C\uDFC1 " (s/capitalize (name to))))
+  (let [s @state
+        station-name #(septa/url-decode (get-in s [::septa/septa %]))
+        from-station (station-name from)
+        to-station   (station-name to)]
+    (str "\uD83D\uDCCD " from-station " \uD83C\uDFC1 " to-station)))
 
 (defn format-train-message [{:keys [departure-time arrival-time delay train-line train-number]}]
-  (str departure-time " ➡ " arrival-time " ⌛ " delay "\n" train-line " \uD83D\uDE8B " train-number))
+  (let [delay-decorator (condp = delay "On time" "✔️" "⌛")]
+    (str departure-time " ➡ " arrival-time " " delay-decorator " " delay "\n" train-line " \uD83D\uDE8B " train-number)))
 
 (defn listen-to-regular! [{:keys [regular outgoing]}]
     (println "Listening to regular...")
@@ -109,8 +114,7 @@
             (a/>! outgoing [chat-id (format-direction (stations-for-user chat-id))])
             (if (= :ok ok)
               (a/>! outgoing [chat-id (s/join "\n\n" (map format-train-message schedule))])
-              (a/>! outgoing [chat-id (str schedule)]))
-          )))))
+              (a/>! outgoing [chat-id (str schedule)])))))))
 
 (defn listen-to-bot! [{:keys [bot]}]
     (a/go

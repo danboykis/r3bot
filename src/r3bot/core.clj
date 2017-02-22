@@ -15,10 +15,10 @@
                 :telegram [:config]
                 :septa [:config]])
 
-(def inits {:config [init-config! identity ::config]
+(def inits {:config   [init-config! identity ::config]
             :channels [channels/init-channels! channels/stop-channels! ::channels/chans]
-            :telegram [telegram/init-telegram! identity ::telegram/telegram]
-            :septa [septa/init-septa! identity ::septa/septa]})
+            :telegram [telegram/init-telegram! identity                ::telegram/telegram]
+            :septa    [septa/init-septa!       identity                ::septa/septa]})
 
 (defn start-r3bot! []
   (reset! state (abk/start! {} inits dep-graph)))
