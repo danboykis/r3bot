@@ -3,7 +3,7 @@
             [r3bot.telegram-api :as telegram]
             [clojure.core.async :as a]))
 
-(defn chat-latch! [s] (-> s ::chans :chat-latch deref))
+(defn chat-latch! [s] (some-> s ::chans :chat-latch deref))
 
 (defn init-channels! [s]
   (let [incoming-ch (a/chan 10)
@@ -11,13 +11,14 @@
         bot-ch      (a/chan 10 (remove (comp empty? :commands)))
         regular-ch  (a/chan 10 (remove (comp empty? :commands)))
         outgoing-ch (a/chan 10)
+        telegram-ch (a/chan 10)
         chat-latch (atom true)]
     (a/sub publication :bot bot-ch)
     (a/sub publication :regular regular-ch)
-    {:incoming incoming-ch :bot bot-ch :regular regular-ch :outgoing outgoing-ch :chat-latch chat-latch}))
+    {:telegram telegram-ch :incoming incoming-ch :bot bot-ch :regular regular-ch :outgoing outgoing-ch :chat-latch chat-latch}))
 
 (defn stop-channels! [s]
   (some-> s :chat-latch (reset! false))
-  (some-> s :pub a/unsub-all)
-  (doseq [k [:incoming :bot :regular :outgoing]]
-    (some-> s k a/close!)))
+  (doseq [k [:incoming :bot :regular :outgoing :telegram]]
+    (some-> s k a/close!))
+  (some-> s :pub a/unsub-all))

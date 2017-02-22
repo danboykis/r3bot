@@ -38,11 +38,11 @@
   (mapv #(cs/rename-keys % rename-lookup) septa-original-response))
 
 
-(defn next-to-arrive! [{:keys [from to number] :or {number 8}} cb]
+(defn next-to-arrive! [{:keys [from to number-trains] :or {number-trains 5}} cb]
   (let [stations (::septa @state)]
     (assert (contains? stations from))
     (assert (contains? stations to))
-    (http/get (str (format (arrivals-url) (stations from) (stations to)) "/" number) cb)))
+    (http/get (str (format (arrivals-url) (stations from) (stations to)) "/" number-trains) cb)))
 
 (defn train-view! [cb]
   (http/get (train-view-url) cb))

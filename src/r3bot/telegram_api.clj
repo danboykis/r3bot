@@ -78,7 +78,9 @@
   (-> updates :result last))
 
 (defn chat-id [message]
-  (get-in message [:message :chat :id]))
+  (or
+    (get-in message [:message :chat :id])
+    (get-in message [:edited-message :chat :id])))
 
 (defn offset [message]
   (:update-id message))
@@ -95,10 +97,13 @@
             (get-in s (conj path :api-key)))))
 
 (defn bot-command? [msg]
-  (some #(= (:type %) "bot_command") (get-in msg [:message :entities])))
+  (let [entities (concat (get-in msg [:message :entities])
+                         (get-in msg [:edited-message :entities]))]
+    (some #(= (:type %) "bot_command") entities)))
 
 (defn message-text [msg]
-  (get-in msg [:message :text]))
+  (or (get-in msg [:message :text])
+      (get-in msg [:edited-message :text])))
 
 (defn init-telegram! [s]
   {:get-messages (build-query s :get-updates)

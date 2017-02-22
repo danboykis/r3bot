@@ -3,6 +3,7 @@
             [r3bot.state :refer [state]]
             [r3bot.fuzzy :as fuzzy]
             [r3bot.channels :as channels]
+            [r3bot.specs :as specs]
             [r3bot.telegram-api :as telegram]
             [cuerdas.core :as s]
             [clojure.core.async :as a])
@@ -42,9 +43,7 @@
 
 (defn find-trains-info [messages]
   (let [train->chat-id (into {} (map (fn [[chat-id {:keys [number-trains]}]]
-                                       [(cond-> (stations-for-user chat-id)
-                                                number-trains (assoc :number number-trains)
-                                                true find-trains)
+                                       [(some-> (stations-for-user chat-id) find-trains)
                                         chat-id])
                                      messages))]
     (a/go-loop [r {} trains (keys train->chat-id)]
@@ -53,28 +52,31 @@
         (let [[schedule ch] (a/alts! trains)]
           (recur (assoc r (get train->chat-id ch) schedule) (remove #{ch} trains)))))))
 
+(defn parse-trains-number [train-number]
+  (if (s/numeric? train-number)
+    (let [n (s/parse-long train-number)]
+      (when (and (pos? n) (<= n 12))
+        n))))
+
 (defn parse-message-text [text]
   (let [t (s/trim text)]
-    (if (s/numeric? t)
-      (let [n (s/parse-long t)]
-        (if (and (pos? n) (<= n 12))
-          {:number-trains n :text t}
-          {:text t}))
-      {:text t})))
+    (some->> (parse-trains-number t) (vector :number-trains) (conj {:text t}))))
 
-(defn parse-station-direction [text]
-  (let [[from to] (drop 1 (s/split text))]
-    (if (or (nil? from) (nil? to))
-      [:error "Invalid command"]
-      {:from (fuzzy/fuzzy-decide-station from)
-       :to   (fuzzy/fuzzy-decide-station to)})))
+(defn parse-bot-text [text]
+  (let [t (s/trim text)
+        has-letters? #(.find (re-matcher #"[A-Za-z]" %))
+        [from to num] (drop 1 (s/split t))]
+    (cond-> (some->> (parse-trains-number num) (vector :number-trains) (conj {:text t}))
+            (has-letters? from) (assoc :from (fuzzy/fuzzy-decide-station from))
+            (has-letters? to)   (assoc :to   (fuzzy/fuzzy-decide-station to))
+            true                (specs/validate ::specs/bot-text)
+            true (assoc :text t))))
 
-(defn chat-poller! [{:keys [incoming]}]
-  (let [c (a/chan)]
-    (telegram/get-request! (telegram/query-offset @state) (telegram/async-telegram c))
+(defn chat-poller! [{:keys [telegram incoming]}]
+    (telegram/get-request! (telegram/query-offset @state) (telegram/async-telegram telegram))
     (a/go
       (while (channels/chat-latch! @state)
-        (when-let [{:keys [result] :as response} (a/<! c)]
+        (when-let [{:keys [result] :as response} (a/<! telegram)]
           (when-not (empty? result)
             (println (str (Instant/now) " got response... " response))
             (swap! state assoc ::telegram/offset (telegram/max-offset response))
@@ -82,7 +84,7 @@
                   bot-commands      (filter telegram/bot-command? result)]
               (a/>! incoming {:command-type :regular :commands regular-commands})
               (a/>! incoming {:command-type :bot     :commands bot-commands})))
-          (telegram/get-request! (telegram/query-offset @state) (telegram/async-telegram c)))))))
+          (telegram/get-request! (telegram/query-offset @state) (telegram/async-telegram telegram))))))
 
 (defn chat-sender! [outgoing-ch]
   (let [c (a/chan)]
@@ -116,12 +118,19 @@
               (a/>! outgoing [chat-id (s/join "\n\n" (map format-train-message schedule))])
               (a/>! outgoing [chat-id (str schedule)])))))))
 
-(defn listen-to-bot! [{:keys [bot]}]
-    (a/go
-      (while (channels/chat-latch! @state)
-        (let [msg (a/<! bot)]
-          (println "Bot: " msg)
-          ))))
+(defn listen-to-bot! [{:keys [bot outgoing]}]
+  (a/go
+    (while (channels/chat-latch! @state)
+      (let [{:keys [commands]} (a/<! bot)
+            m (into {} (map (juxt telegram/chat-id (comp parse-bot-text telegram/message-text)) commands))]
+        (doseq [[chat-id stations] m]
+          (if-let [err (::specs/error stations)]
+            (a/>! outgoing err)
+            (let [[ok trains-info] (a/<! (find-trains stations))]
+              (a/>! outgoing [chat-id (format-direction stations)])
+              (if (= :ok ok)
+                (a/>! outgoing [chat-id (s/join "\n\n" (map format-train-message trains-info))])
+                (a/>! outgoing [chat-id (str trains-info)])))))))))
 
 (defn chat-cycle []
   (let [;incoming-ch (-> @state ::channels/chans :incoming)
