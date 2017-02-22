@@ -75,14 +75,14 @@
     (a/go
       (while (channels/chat-latch! @state)
         (when-let [{:keys [result] :as response} (a/<! c)]
-          (telegram/get-request! (telegram/query-offset @state) (telegram/async-telegram c))
           (when-not (empty? result)
             (println (str (Instant/now) " got response... " response))
             (swap! state assoc ::telegram/offset (telegram/max-offset response))
             (let [regular-commands  (remove telegram/bot-command? result)
                   bot-commands      (filter telegram/bot-command? result)]
               (a/>! regular {:commands regular-commands})
-              (a/>! bot     {:commands bot-commands}))))))))
+              (a/>! bot     {:commands bot-commands})))
+          (telegram/get-request! (telegram/query-offset @state) (telegram/async-telegram c)))))))
 
 (defn chat-sender! [outgoing-ch]
   (let [c (a/chan)]
