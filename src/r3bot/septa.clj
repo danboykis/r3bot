@@ -38,7 +38,7 @@
   (mapv #(cs/rename-keys % rename-lookup) septa-original-response))
 
 
-(defn next-to-arrive! [{:keys [from to number-trains] :or {number-trains 5}} cb]
+(defn next-to-arrive! [{:keys [from to number-trains] :or {number-trains 3}} cb]
   (let [stations (::septa @state)]
     (assert (contains? stations from))
     (assert (contains? stations to))

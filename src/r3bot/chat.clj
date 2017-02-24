@@ -43,7 +43,7 @@
 
 (defn find-trains-info [messages]
   (let [train->chat-id (into {} (map (fn [[chat-id {:keys [number-trains]}]]
-                                       [(some-> (stations-for-user chat-id) find-trains)
+                                       [(some-> (stations-for-user chat-id) (assoc :number-trains number-trains) find-trains)
                                         chat-id])
                                      messages))]
     (a/go-loop [r {} trains (keys train->chat-id)]
