@@ -102,8 +102,8 @@
     (str "\uD83D\uDCCD " from-station " \uD83C\uDFC1 " to-station)))
 
 (defn format-train-message [{:keys [departure-time arrival-time delay train-line train-number]}]
-  (let [delay-decorator (condp = delay "On time" "✔️" "⌛")]
-    (str departure-time " ➡ " arrival-time " " delay-decorator " " delay "\n" train-line " \uD83D\uDE8B " train-number)))
+  (let [delay-decorator (condp = delay "On time" "," "⌛")]
+    (str departure-time " 🕐 " arrival-time " " delay-decorator " " delay "\n" train-line " 🚊 " train-number)))
 
 (defn listen-to-regular! [{:keys [regular outgoing]}]
     (println "Listening to regular...")
